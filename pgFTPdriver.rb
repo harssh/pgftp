@@ -41,13 +41,18 @@ end
     
      res = conn.exec('select * from test')
     
-    res.each do |p|
-        if user == p[0][1] && pass == p[0][2] #to checking correct username & password
+    res.each do |row|
+     puts #{row[0]}
+     puts #{row[1]}
+        if user == row[2] && pass == row[3] #to checking correct username & password
          yield true
+         
           return
             end
                end
-      yield false 
+               
+       yield false
+       
     #yield user == "test" && pass == "1234"
   end
 
