@@ -11,14 +11,69 @@
 require 'pg'
 
 class PgFTPDriver
-  FILE_ONE = "This is the first file available for download.\n\nBy James"
-  FILE_TWO = "This is the file number two.\n\n2009-03-21"
+  
 
   def change_dir(path, &block)
-  
+    
+  begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt2','select name from folder where name=$1')
+    
+       res = conn.exec_prepared('stmt2',[path])
+               
+         if res.count == 1
+           yield true
+           return
+         
+         else   
+         
+          yield false         
+          return
+             
+         end   
+    
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end
   end
 
   def dir_contents(path, &block)
+    begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt3','select foid from folder where name=$1')
+      
+       conn.prepare('stmt4','select name from file where foid=$2')
+       
+    conn.prepare('stmt4','select name from file where foid is (select foid from folder where name=$1)')
+    
+       res = conn.exec_prepared('stmt2',[path])
+               
+         if res.count == 1
+           yield true
+           return
+         
+         else   
+         
+          yield false         
+          return
+             
+         end   
+    
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end
    
   end
 
@@ -94,7 +149,15 @@ class PgFTPDriver
     
        res = conn.exec_prepared('stmt1',[path,data])
     
-           
+           if res.count == 1
+           yield true
+           return
+         else                    
+         
+          yield false         
+          return
+             
+         end   
     rescue Exception => e
       
       puts e.message
