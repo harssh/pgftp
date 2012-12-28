@@ -45,80 +45,41 @@ class PgFTPDriver
 
   def dir_contents(path, &block)
     
-  case path
-    
-  when "/" then
-    
-      begin
-         conn = connecttodb() 
-    
-        
-       
-         conn.prepare('stmt4','select name from folder where pname=$1')
-       
-         conn.prepare('stmt5', 'select name from file where pnmae=$1')
-    
-          
-       
-          res2 = conn.exec_prepared('stmt4',[path])
-          
-          res3 = conn.exec_prepared('stmt5',[path])
-          
-              
-          
-               res2.each do |row|
-                 
-                 rvalue = res2.getvalue(0,0)
-                
-             yield [ dir_item(rvalue) ]
-             
-             res3.each do |row1|
-              yield [ file_item(row1) ]
-          end
-          end
-      
-              
-      
-                   
-    rescue Exception => e
-      
-      puts e.message
-      
-    ensure
-      closedb(conn)
-    
-    end  
-    
+  case path    
+  
   when path then
     
     begin
          conn = connecttodb() 
     
-         conn.prepare('stmt3','select name from folder where name=$1')    
+           
        
          conn.prepare('stmt4','select name from folder where pname=$1')
        
          conn.prepare('stmt5', 'select name from file where pnmae=$1')
     
-          res1 = conn.exec_prepared('stmt3',[path])
+        
        
           res2 = conn.exec_prepared('stmt4',[path])
           
           res3 = conn.exec_prepared('stmt5',[path])
           
               
-          res1.each do |row|
-             yield [ dir_item(row) ]
-          end
-           
+                     
+          if res2.count != 0 || res3.count != 0 
+            
+        
            res2.each do |row|
              yield [ dir_item(row) ]
-              res3.each do |row1|
-             yield [ file_item(row1) ]
-          end
+              
           end
       
-             
+             res3.each do |row1|
+             yield [ file_item(row1) ]
+             end
+           else 
+        yield false
+      end
       
                    
     rescue Exception => e
@@ -232,19 +193,83 @@ class PgFTPDriver
   end
 
   def delete_file(path, &block)
-    yield false
+   begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt6','delete from file where name=$1')
+              
+    
+      res4 = conn.exec_prepared('stmt6',[path])
+       
+       
+           
+           yield true
+         
+          
+         
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end
+    
   end
 
   def delete_dir(path, &block)
-    yield false
+    begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt6','delete from folder where name=$1')
+       
+       conn.prepare('stmt7','delete from folder where pname=$1')
+       
+    
+       res4 = conn.exec_prepared('stmt6',[path])
+       
+       res5 = conn.exec_prepared('stmt7',[path])
+       
+           
+           yield true
+         
+          
+         
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end
+    
   end
 
-  def rename(from, to, &block)
-    yield false
-  end
-
+ 
   def make_dir(path, &block)
-    yield false
+    begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt6','insert into folder (name,pname) values ($1,$2)')
+    
+       res = conn.exec_prepared('stmt6',[path,'/'])
+    
+           
+           yield true
+         
+          
+         
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end
+    
   end
 
 private
@@ -269,55 +294,6 @@ private
     
   end
   
-  def dir_structure(path)
-    begin
-       conn = connecttodb() 
-    
-       conn.prepare('stmt3','select name from folder where name=$1')
-      
-       conn.prepare('stmt4','select name from folder where pname=$1')
-       
-       conn.prepare('stmt5', 'select name from file where pnmae=$1')
-       
-    #conn.prepare('stmt4','select name from file where foid is (select foid from folder where name=$1)')
-    
-       res1 = conn.exec_prepared('stmt3',[path])
-       
-       res2 = conn.exec_prepared('stmt4',[path])
-       
-       res3 = conn.exec_prepared('stmt5',[path])
-    
-        
-    
-      res1.each do |row|
-        
-        yield [ dir_item(row)]
-        
-      end
-        
-        res2.each do |row|
-          
-          yield [dir_item(row)]
-      
-        end      
-      
-        res3.each do |row|
-          
-          yield [ file_item(row) ]
-          
-        end   
-   
-    rescue Exception => e
-      
-      puts e.message
-      
-    ensure
-      closedb(conn)
-    
-    end
-   
-    
-  end
   
   
 end
