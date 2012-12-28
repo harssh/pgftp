@@ -11,7 +11,7 @@
 require 'pg'
 
 class PgFTPDriver
-  
+  FILE_ONE = "This is the first file available for download.\n\nBy James"
 
   def change_dir(path, &block)
     
@@ -44,28 +44,42 @@ class PgFTPDriver
   end
 
   def dir_contents(path, &block)
-    begin
-       conn = connecttodb() 
     
-       conn.prepare('stmt3','select foid from folder where name=$1')
-      
-       conn.prepare('stmt4','select name from file where foid=$2')
+  case path
+    
+  when "/" then
+    
+      begin
+         conn = connecttodb() 
+    
+        
        
-    conn.prepare('stmt4','select name from file where foid is (select foid from folder where name=$1)')
+         conn.prepare('stmt4','select name from folder where pname=$1')
+       
+         conn.prepare('stmt5', 'select name from file where pnmae=$1')
     
-       res = conn.exec_prepared('stmt2',[path])
-               
-         if res.count == 1
-           yield true
-           return
-         
-         else   
-         
-          yield false         
-          return
+          
+       
+          res2 = conn.exec_prepared('stmt4',[path])
+          
+          res3 = conn.exec_prepared('stmt5',[path])
+          
+              
+          
+               res2.each do |row|
+                 
+                 rvalue = res2.getvalue(0,0)
+                
+             yield [ dir_item(rvalue) ]
              
-         end   
-    
+             res3.each do |row1|
+              yield [ file_item(row1) ]
+          end
+          end
+      
+              
+      
+                   
     rescue Exception => e
       
       puts e.message
@@ -73,8 +87,55 @@ class PgFTPDriver
     ensure
       closedb(conn)
     
-    end
-   
+    end  
+    
+  when path then
+    
+    begin
+         conn = connecttodb() 
+    
+         conn.prepare('stmt3','select name from folder where name=$1')    
+       
+         conn.prepare('stmt4','select name from folder where pname=$1')
+       
+         conn.prepare('stmt5', 'select name from file where pnmae=$1')
+    
+          res1 = conn.exec_prepared('stmt3',[path])
+       
+          res2 = conn.exec_prepared('stmt4',[path])
+          
+          res3 = conn.exec_prepared('stmt5',[path])
+          
+              
+          res1.each do |row|
+             yield [ dir_item(row) ]
+          end
+           
+           res2.each do |row|
+             yield [ dir_item(row) ]
+              res3.each do |row1|
+             yield [ file_item(row1) ]
+          end
+          end
+      
+             
+      
+                   
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end   
+    
+    else
+      
+      yield[]
+      
+   end
+     
   end
 
 
@@ -116,6 +177,7 @@ class PgFTPDriver
        conn = connecttodb() 
     
        conn.prepare('stmt1','select content from file where name=$1 ')
+              
     
        res = conn.exec_prepared('stmt1',[path])
     
@@ -193,9 +255,10 @@ private
 
   def file_item(name, bytes)
     EM::FTPD::DirectoryItem.new(:name => name, :directory => false, :size => bytes)
+ 
   end
   
-    def connecttodb()
+  def connecttodb()
     PGconn.new('localhost', 5432, '', '', 'test', 'postgres', '123456') 
   end
 
@@ -205,6 +268,58 @@ private
     end
     
   end
+  
+  def dir_structure(path)
+    begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt3','select name from folder where name=$1')
+      
+       conn.prepare('stmt4','select name from folder where pname=$1')
+       
+       conn.prepare('stmt5', 'select name from file where pnmae=$1')
+       
+    #conn.prepare('stmt4','select name from file where foid is (select foid from folder where name=$1)')
+    
+       res1 = conn.exec_prepared('stmt3',[path])
+       
+       res2 = conn.exec_prepared('stmt4',[path])
+       
+       res3 = conn.exec_prepared('stmt5',[path])
+    
+        
+    
+      res1.each do |row|
+        
+        yield [ dir_item(row)]
+        
+      end
+        
+        res2.each do |row|
+          
+          yield [dir_item(row)]
+      
+        end      
+      
+        res3.each do |row|
+          
+          yield [ file_item(row) ]
+          
+        end   
+   
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end
+   
+    
+  end
+  
+  
 end
 
 # configure the server
