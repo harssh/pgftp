@@ -11,7 +11,7 @@
 require 'pg'
 
 class PgFTPDriver
-  FILE_ONE = "This is the first file available for download.\n\nBy James"
+  
 
   def change_dir(path, &block)
     
@@ -50,36 +50,34 @@ class PgFTPDriver
   when path then
     
     begin
-         conn = connecttodb() 
-    
+         conn = connecttodb()     
            
        
-         conn.prepare('stmt4','select name from folder where pname=$1')
+          conn.prepare('stmt4','select name from folder where pname=$1')
        
-         conn.prepare('stmt5', 'select name from file where pnmae=$1')
-    
+          conn.prepare('stmt5', 'select name from file where pnmae=$1')    
         
        
           res2 = conn.exec_prepared('stmt4',[path])
           
           res3 = conn.exec_prepared('stmt5',[path])
           
-              
-                     
-          if res2.count != 0 || res3.count != 0 
+                             
+           if res2.count != 0 || res3.count != 0 
             
-        
            res2.each do |row|
              yield [ dir_item(row) ]
-              
-          end
+           end
       
-             res3.each do |row1|
+         res3.each do |row1|
              yield [ file_item(row1) ]
-             end
-           else 
-        yield false
-      end
+         end
+         
+         
+         else 
+            yield false
+      
+         end
       
                    
     rescue Exception => e
@@ -93,13 +91,11 @@ class PgFTPDriver
     
     else
       
-      yield[]
+      yield false
       
    end
      
   end
-
-
 
   def authenticate(user, pass, &block)
       
@@ -130,32 +126,10 @@ class PgFTPDriver
     
     end
   end
-   
 
   def bytes(path, &block)
     
-    begin
-       conn = connecttodb() 
-    
-       conn.prepare('stmt1','select content from file where name=$1 ')
-              
-    
-       res = conn.exec_prepared('stmt1',[path])
-    
-       fcontent = res.getvalue(0,0)
-       
-       puts fcontent
-           
-        yield fcontent.size()
-        
-    rescue Exception => e
-      
-      puts e.message
-      
-    ensure
-      closedb(conn)
-    
-    end
+    yield true
    
   end
 
@@ -246,7 +220,6 @@ class PgFTPDriver
     end
     
   end
-
  
   def make_dir(path, &block)
     begin

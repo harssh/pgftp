@@ -2,7 +2,7 @@
 
 require 'pg'
 
-        conn = PGconn.new('localhost', 5432, '', '', 'test', 'postgres', '123456')
+       
         
 describe "pgFTPdriver" do
 
@@ -12,7 +12,7 @@ describe "pgFTPdriver" do
     it "should connect to db" do
      
      
-        conn = PGconn.new('localhost', 5432, '', '', 'test', 'postgres', '123456')      
+        conn = connecttodb()
         
         conn.should_not be_nil                
       
@@ -22,7 +22,7 @@ describe "pgFTPdriver" do
       
       it "should get value in resulset" do
         
-        conn = PGconn.new('localhost', 5432, '', '', 'test', 'postgres', '123456') 
+        conn = connecttodb() 
         
         conn.prepare('stmt1','select name,pass from test where name=$1 and pass=$2')
     
@@ -34,22 +34,33 @@ describe "pgFTPdriver" do
       
     end
     
-     describe "bytes" do
     
-     it "should get file content in resultset" do          
+  
+  describe "make dir" do
+    
+     it "should get list of dirs" do
+       
+       conn = connecttodb() 
+       
+       conn.prepare('stmt4','select name from folder where pname=$1')
+       
              
        
-        conn = PGconn.new('localhost', 5432, '', '', 'test', 'postgres', '123456')
-        
-        conn.prepare('stmt2','select content from file where name=$1 ')
-    
-        res = conn.exec_prepared('stmt2','\documents')
-         
-        res.should_not be_nil
-         
-    end
-    
+        res2 = conn.exec_prepared('stmt4',['/'])
+          
+                             
+        res2.count.should_not be_nil   
+  
+  
+     end
+  
+  
   end
+  
+    
+    def connecttodb()
+    PGconn.new('localhost', 5432, '', '', 'test', 'postgres', '123456') 
+    end 
     
     
   end
