@@ -55,7 +55,7 @@ group :test do
 
 end
 
-gem 'em-ftpd'
+gem 'em-ftpd', :git => "https://github.com/threadmetal/em-ftpd"
 gem 'eventmachine'
 
 # Test gems on Linux

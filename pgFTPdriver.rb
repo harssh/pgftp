@@ -12,6 +12,7 @@ require 'pg'
 
 class PgFTPDriver
   
+attr_accessor :current_dir  
 
   def change_dir(path, &block)
     
@@ -23,13 +24,17 @@ class PgFTPDriver
        res = conn.exec_prepared('stmt2',[path])
                
          if res.count == 1
-           yield true
-           return
+           
+           currentdir(path)
+           
+           puts current_dir
+           
+           yield true           
          
          else   
          
           yield false         
-          return
+          
              
          end   
     
@@ -42,44 +47,17 @@ class PgFTPDriver
     
     end
   end
-
-  def dir_contents(path, &block)
-    
-  case path    
   
-  when path then
-    
+  def make_dir(path, &block)
     begin
-         conn = connecttodb()     
+       conn = connecttodb() 
+      
+       conn.prepare('stmt6','insert into folder (name,pname) values ($1,$2)')
+    
+       res = conn.exec_prepared('stmt6',[path,current_dir||"/"])    
            
-       
-          conn.prepare('stmt4','select name from folder where pname=$1')
-       
-          conn.prepare('stmt5', 'select name from file where pnmae=$1')    
-        
-       
-          res2 = conn.exec_prepared('stmt4',[path])
-          
-          res3 = conn.exec_prepared('stmt5',[path])
-          
-                             
-           if res2.count != 0 || res3.count != 0 
-            
-           res2.each do |row|
-             yield [ dir_item(row) ]
-           end
-      
-         res3.each do |row1|
-             yield [ file_item(row1) ]
-         end
+           yield true                   
          
-         
-         else 
-            yield false
-      
-         end
-      
-                   
     rescue Exception => e
       
       puts e.message
@@ -87,16 +65,10 @@ class PgFTPDriver
     ensure
       closedb(conn)
     
-    end   
+    end
     
-    else
-      
-      yield false
-      
-   end
-     
   end
-
+  
   def authenticate(user, pass, &block)
       
    begin
@@ -109,11 +81,11 @@ class PgFTPDriver
            
          if res.count == 1
            yield true
-           return
+           
          else                    
          
           yield false         
-          return
+          
              
          end   
     
@@ -126,33 +98,23 @@ class PgFTPDriver
     
     end
   end
-
-  def bytes(path, &block)
-    
-    yield true
-   
-  end
-
-  def get_file(path, &block)
-    yield false
-  end
-
+  
   def put_file(path, data, &block)
     
     begin
        conn = connecttodb() 
     
-       conn.prepare('stmt1','insert into file values ($1,$2)')
+       conn.prepare('stmt1','insert into file (name,data,pnmae) values ($1,$2,$3)')
     
-       res = conn.exec_prepared('stmt1',[path,data])
+       res = conn.exec_prepared('stmt1',[path,data,current_dir||"/"])
     
            if res.count == 1
            yield true
-           return
+           
          else                    
          
           yield false         
-          return
+          
              
          end   
     rescue Exception => e
@@ -173,13 +135,9 @@ class PgFTPDriver
        conn.prepare('stmt6','delete from file where name=$1')
               
     
-      res4 = conn.exec_prepared('stmt6',[path])
+       res4 = conn.exec_prepared('stmt6',[path])
        
-       
-           
-           yield true
-         
-          
+            yield true           
          
     rescue Exception => e
       
@@ -206,8 +164,7 @@ class PgFTPDriver
        res5 = conn.exec_prepared('stmt7',[path])
        
            
-           yield true
-         
+           yield true         
           
          
     rescue Exception => e
@@ -221,19 +178,104 @@ class PgFTPDriver
     
   end
  
-  def make_dir(path, &block)
+  def dir_contents(path, &block)
+     
+  
+    begin
+         conn = connecttodb()     
+           
+       
+          conn.prepare('stmt4','select name from folder where pname=$1')
+       
+          conn.prepare('stmt5', 'select name,data from file where pnmae=$1')    
+        
+       
+          res2 = conn.exec_prepared('stmt4',[path])
+          
+          res3 = conn.exec_prepared('stmt5',[path])          
+                             
+                   
+               yield [ dir_item(res2.getvalue(0,0)) ]
+                     
+                         
+    
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end    
+   
+   
+     
+  end
+  
+  def get_file(path, &block)
+     begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt1','select name,data from file where name=$1')
+    
+    puts path
+    
+       res = conn.exec_prepared('stmt1',[path])
+       
+       
+          data = res.getvalue(0,1)
+          
+          if File.exist?("/home/harssh/Documents"+path)
+            
+
+             file = File.open("/home/harssh/Documents"+path, "w")
+          
+             file.write("#{data}") 
+             
+          else
+           
+              File.new("/home/harssh/Documents"+path, "w")
+
+              file = File.open("/home/harssh/Documents"+path, "w")
+          
+              file.write("#{data}") 
+          end
+                
+                     
+                     yield true
+                     
+          
+                     
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      
+      closedb(conn)
+      
+      file.close unless file == nil
+          
+           
+       
+      
+    end
+    
+  end
+ 
+  def bytes(path, &block)
+    
     begin
        conn = connecttodb() 
     
-       conn.prepare('stmt6','insert into folder (name,pname) values ($1,$2)')
+       conn.prepare('stmt1','select length(data) from file where pnmae=$1')              
     
-       res = conn.exec_prepared('stmt6',[path,'/'])
+       res = conn.exec_prepared('stmt1',[path])
     
-           
-           yield true
-         
-          
-         
+       fcontent = res.getvalue(0,0)
+       
+       yield fcontent
+        
     rescue Exception => e
       
       puts e.message
@@ -243,16 +285,17 @@ class PgFTPDriver
     
     end
     
+   
   end
-
+  
 private
 
   def dir_item(name)
     EM::FTPD::DirectoryItem.new(:name => name, :directory => true, :size => 0)
   end
 
-  def file_item(name, bytes)
-    EM::FTPD::DirectoryItem.new(:name => name, :directory => false, :size => bytes)
+  def file_item(name)
+    EM::FTPD::DirectoryItem.new(:name => name, :directory => false, :size => 0)
  
   end
   
@@ -266,8 +309,15 @@ private
     end
     
   end
+
+def currentdir(path)
   
+  @current_dir = path
+
+  puts current_dir
   
+end  
+
   
 end
 
