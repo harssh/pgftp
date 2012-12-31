@@ -268,14 +268,23 @@ attr_accessor :current_dir
     begin
        conn = connecttodb() 
     
-       conn.prepare('stmt1','select length(data) from file where pnmae=$1')              
+       conn.prepare('stmt1','select length(data) from file where name=$1')              
     
        res = conn.exec_prepared('stmt1',[path])
     
        fcontent = res.getvalue(0,0)
        
-       yield fcontent
-        
+       if res.count ==0
+          yield true
+     
+        else
+          
+          yield false
+
+       end
+      
+         
+            return fcontent  
     rescue Exception => e
       
       puts e.message
@@ -295,7 +304,7 @@ private
   end
 
   def file_item(name)
-    EM::FTPD::DirectoryItem.new(:name => name, :directory => false, :size => 0)
+    EM::FTPD::DirectoryItem.new(:name => name, :directory => false, :size => bytes)
  
   end
   
