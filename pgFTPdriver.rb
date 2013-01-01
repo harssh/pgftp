@@ -188,35 +188,34 @@ attr_accessor :current_dir  ,:current_dirid
     begin
           conn = connecttodb()     
            
-       
-          conn.prepare('stmt3','select id from folders where name=$1')
            
           conn.prepare('stmt4','select name from folders where pname=$1')
-       
+             
           conn.prepare('stmt5', 'select name,data from file where pnmae=$1')    
-        
-       
-          res4 = conn.exex_prepared('stmt3',[path])
-     
-           fname = res4.getvalue(0,0)           
-       
-          res2 = conn.exec_prepared('stmt4',[fname])
+                
+          res2 = conn.exec_prepared('stmt4',[current_dirid||'1'])
           
-          res3 = conn.exec_prepared('stmt5',[fname])          
+          res3 = conn.exec_prepared('stmt5',[current_dirid||'1'])          
                          
+               folderlist = Array.new
+               dirlist = Array.new
                                            
                res2.each_with_index do |row1,k|
                                  
                  val = res2.getvalue(k,0)
                  
-                 name = val.tr('^A-Za-z0-9', '')
-                                    
-                  yield [ dir_item(name),file_item(res3.getvalue(0,0), 20) ]    
-                                                            
-                 
+                 fname = val.tr('^A-Za-z0-9', '')
+                  
+                  folderlist[k] = fname         
+              
+           
+              
                  k = k+1
                   
                 end       
+              puts folderlist
+               dirlist1 =  dir_item("files")
+                  yield [ dirlist ]    
               
           
     rescue Exception => e
@@ -264,6 +263,7 @@ attr_accessor :current_dir  ,:current_dirid
               file = File.open("/home/harssh/Documents"+path, "w")
           
               file.write("#{data}") 
+         
           end
                 
                 yield true
@@ -322,7 +322,7 @@ attr_accessor :current_dir  ,:current_dirid
   
 private
 
-  def dir_item(*name)
+  def dir_item(name)
         
       EM::FTPD::DirectoryItem.new(:name => name, :directory => true, :size => 0)
              
@@ -349,7 +349,7 @@ def currentdir(path,id)
   
   @current_dir = path
   @current_dirid = id
-  puts current_dir
+  
   
 end  
 
