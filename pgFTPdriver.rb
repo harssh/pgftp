@@ -1,31 +1,23 @@
 
-
-# coding: utf-8
-
-# a super simple FTP server with hard coded auth details and only two files
-# available for download.
-#
-# Usage:
-#
-
 require 'pg'
 
 class PgFTPDriver
-  
-attr_accessor :current_dir  
+  FILE_ONE = "This is the first file available for download.\n\nBy James"
+attr_accessor :current_dir  ,:current_dirid
 
   def change_dir(path, &block)
     
   begin
        conn = connecttodb() 
+    puts path
+       conn.prepare('stmt2','select name,foid from folders where pname=$1 and name=$2')
     
-       conn.prepare('stmt2','select name from folder where name=$1')
-    
-       res = conn.exec_prepared('stmt2',[path])
+       res = conn.exec_prepared('stmt2',[current_dirid||'1',path])
                
          if res.count == 1
            
-           currentdir(path)
+           currentdir(path,res.getvalue(0,1))
+           
            
            puts current_dir
            
@@ -51,10 +43,19 @@ attr_accessor :current_dir
   def make_dir(path, &block)
     begin
        conn = connecttodb() 
+       puts path
       
-       conn.prepare('stmt6','insert into folder (name,pname) values ($1,$2)')
+       # conn.prepare('stmt1','select foid from folders where name=$1')
+#        
+       # res1 = conn.exec_prepared('stmt1',[current_dir||'/'])
+#        
+#       
+         # dirid = res1.getvalue(0,0)
+      
+       conn.prepare('stmt6','insert into folders (name,pname) values ($1,$2)')
+              
     
-       res = conn.exec_prepared('stmt6',[path,current_dir||"/"])    
+       res = conn.exec_prepared('stmt6',[path,current_dirid||'1'])    
            
            yield true                   
          
@@ -180,25 +181,44 @@ attr_accessor :current_dir
  
   def dir_contents(path, &block)
      
-  
+  case path
+    
+  when path then    
+    
     begin
-         conn = connecttodb()     
+          conn = connecttodb()     
            
        
-          conn.prepare('stmt4','select name from folder where pname=$1')
+          conn.prepare('stmt3','select id from folders where name=$1')
+           
+          conn.prepare('stmt4','select name from folders where pname=$1')
        
           conn.prepare('stmt5', 'select name,data from file where pnmae=$1')    
         
        
-          res2 = conn.exec_prepared('stmt4',[path])
+          res4 = conn.exex_prepared('stmt3',[path])
+     
+           fname = res4.getvalue(0,0)           
+       
+          res2 = conn.exec_prepared('stmt4',[fname])
           
-          res3 = conn.exec_prepared('stmt5',[path])          
-                             
-                   
-               yield [ dir_item(res2.getvalue(0,0)) ]
-                     
+          res3 = conn.exec_prepared('stmt5',[fname])          
                          
-    
+                                           
+               res2.each_with_index do |row1,k|
+                                 
+                 val = res2.getvalue(k,0)
+                 
+                 name = val.tr('^A-Za-z0-9', '')
+                                    
+                  yield [ dir_item(name),file_item(res3.getvalue(0,0), 20) ]    
+                                                            
+                 
+                 k = k+1
+                  
+                end       
+              
+          
     rescue Exception => e
       
       puts e.message
@@ -208,7 +228,12 @@ attr_accessor :current_dir
     
     end    
    
-   
+   else
+     
+      yield true
+      
+      end
+        
      
   end
   
@@ -241,8 +266,7 @@ attr_accessor :current_dir
               file.write("#{data}") 
           end
                 
-                     
-                     yield true
+                yield true
                      
           
                      
@@ -256,8 +280,7 @@ attr_accessor :current_dir
       
       file.close unless file == nil
           
-           
-       
+              
       
     end
     
@@ -299,11 +322,14 @@ attr_accessor :current_dir
   
 private
 
-  def dir_item(name)
-    EM::FTPD::DirectoryItem.new(:name => name, :directory => true, :size => 0)
+  def dir_item(*name)
+        
+      EM::FTPD::DirectoryItem.new(:name => name, :directory => true, :size => 0)
+             
+  
   end
 
-  def file_item(name)
+  def file_item(name,bytes)
     EM::FTPD::DirectoryItem.new(:name => name, :directory => false, :size => bytes)
  
   end
@@ -319,10 +345,10 @@ private
     
   end
 
-def currentdir(path)
+def currentdir(path,id)
   
   @current_dir = path
-
+  @current_dirid = id
   puts current_dir
   
 end  
