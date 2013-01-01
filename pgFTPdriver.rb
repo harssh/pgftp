@@ -3,7 +3,7 @@ require 'pg'
 
 class PgFTPDriver
   FILE_ONE = "This is the first file available for download.\n\nBy James"
-attr_accessor :current_dir  ,:current_dirid
+attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
 
   def change_dir(path, &block)
     
@@ -198,7 +198,7 @@ attr_accessor :current_dir  ,:current_dirid
           res3 = conn.exec_prepared('stmt5',[current_dirid||'1'])          
                          
                folderlist = Array.new
-               dirlist = Array.new
+               @dirlist = Array.new
                                            
                res2.each_with_index do |row1,k|
                                  
@@ -208,14 +208,22 @@ attr_accessor :current_dir  ,:current_dirid
                   
                   folderlist[k] = fname         
               
-           
-              
+                      
+                 @dirlis = dir_item(fname)
+                      
+                      @dirlist[k] = @dirlis
+                      
                  k = k+1
                   
                 end       
               puts folderlist
-               dirlist1 =  dir_item("files")
-                  yield [ dirlist ]    
+                puts dirlist
+           #  yield [ dirlist]  
+             Enumerator.new do |y|
+    
+    dirlist.each { |val| y.yield(val) }
+  end.each(&block)
+               
               
           
     rescue Exception => e
@@ -229,7 +237,7 @@ attr_accessor :current_dir  ,:current_dirid
    
    else
      
-      yield true
+      yield []
       
       end
         
@@ -322,7 +330,7 @@ attr_accessor :current_dir  ,:current_dirid
   
 private
 
-  def dir_item(name)
+  def dir_item(*name)
         
       EM::FTPD::DirectoryItem.new(:name => name, :directory => true, :size => 0)
              
