@@ -5,13 +5,13 @@ require 'eventmachine'
 
 class PgFTPDriver
   
-attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
+attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
 
   def change_dir(path, &block)
     
   begin
        conn = connecttodb() 
-       puts path
+       puts "changing dir to : "+path
        conn.prepare('stmt2','select name,foid from folders where pname=$1 and name=$2')
     
        res = conn.exec_prepared('stmt2',[current_dirid||'1',path])
@@ -19,10 +19,10 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
          if res.count == 1
            
            currentdir(path,res.getvalue(0,1))
+                      
+           puts "Current dir is : "+current_dir
            
-           
-           puts current_dir
-           
+           puts "Current dir id is : "+current_dirid
            yield true           
          
          else   
@@ -43,15 +43,19 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
   end
   
   def make_dir(path, &block)
+   
+   newdirname = path.match(/([^\/.]*)$/)
+   
+   ndirname = "/"+newdirname[0]
+   
     begin
+      
        conn = connecttodb() 
        puts path
       
-           
        conn.prepare('stmt6','insert into folders (name,pname) values ($1,$2)')
               
-    
-       res = conn.exec_prepared('stmt6',[path,current_dirid||'1'])    
+       res = conn.exec_prepared('stmt6',[ndirname,current_dirid||'1'])    
            
            yield true                   
          
@@ -103,12 +107,9 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
     
        conn.prepare('stmt1','insert into files (name,data,pname) values ($1,$2,$3)')
     
-       res = conn.exec_prepared('stmt1',[path,data,current_dirid||"1"])
-    
+       res = conn.exec_prepared('stmt1',[path,data,current_dirid||"1"])    
           
-           yield true
-               
-                    
+           yield true                   
           
     rescue Exception => e
       
@@ -125,9 +126,8 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
    begin
        conn = connecttodb() 
     
-       conn.prepare('stmt6','delete from file where name=$1 and pname=$2')
-              
-    
+       conn.prepare('stmt6','delete from files where name=$1 and pname=$2')
+                  
        res4 = conn.exec_prepared('stmt6',[path,current_dirid||'1'])
        
             yield true           
@@ -144,8 +144,10 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
   end
 
   def delete_dir(path, &block)
+   
     begin
-       conn = connecttodb() 
+    puts path
+       conn = connecttodb()      
        
        conn.prepare('stmt9','select foid from folders where name=$1 and pname=$2')
     
@@ -160,8 +162,7 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
        
        parent_id = res9.getvalue(0,0)
        
-       res7 = conn.exec_prepared('stmt7',[parent_id])
-       
+       res7 = conn.exec_prepared('stmt7',[parent_id])     
        
            
            yield true         
@@ -182,11 +183,11 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
      
   case path
     
-  when path then    
+  when "/" then    
     
   path =  "/"+path.tr('^A-Za-z', '')
   
-  puts path
+  puts "contents of : "+path
     begin
           conn = connecttodb()     
                      
@@ -198,35 +199,28 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
           
           res3 = conn.exec_prepared('stmt5',[current_dirid||'1'])          
                          
-               folderlist = Array.new
+              
                @dirlist = Array.new
                   k =0                         
             
-               res2.each do |row1|
-                                 
-                  val = res2.getvalue(k,0)
-                 
-                  fname = val.tr('^A-Za-z0-9', '')
-                  puts val
-                  folderlist[k] = val                   
-                      
-                  @dirlist[k] = dir_item(val)
-                     
-                                        
-                  k = k+1
-                  
-               end 
+               res2.each do |row1|                                 
+                  val = res2.getvalue(k,0)                                 
                
-               puts k
+                  val = val.tr('^A-Za-z0-9', '')
+               
+                  @dirlist[k] = dir_item(val)                  
+                                        
+                  k = k+1                  
+               end 
+                                         
                
                 res3.each_with_index do |row2,m|
                                  
-                  val = res3.getvalue(m,0)
-                 
-                 # fname = val.tr('^A-Za-z0-9', '')
-                  
-                  folderlist[k] = val                   
+                  val = res3.getvalue(m,0)                                    
                       
+                    val = val.tr('^A-Za-z0-9', '')
+               
+                 
                   @dirlist[k] = file_item(val,'20')
                      
                   m = m+1                      
@@ -234,8 +228,7 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
                   
                end           
            
-            yield [ *dirlist ]  
-             
+            yield [ *dirlist ]               
            
           
     rescue Exception => e
@@ -246,8 +239,62 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
       
       closedb(conn)
     
-    end    
-   
+    end       
+     
+     when path then    
+    
+        path =  "/"+path.tr('^A-Za-z', '')
+  
+        puts "contents of : "+path
+    begin
+          conn = connecttodb()     
+                     
+          conn.prepare('stmt4','select name from folders where pname=$1')
+             
+          conn.prepare('stmt5', 'select name,data from files where pname=$1')    
+                
+          res2 = conn.exec_prepared('stmt4',[current_dirid||'1'])
+          
+          res3 = conn.exec_prepared('stmt5',[current_dirid||'1'])          
+                         
+              
+               @dirlist = Array.new
+                  k =0                         
+            
+               res2.each do |row1|                                 
+                  val = res2.getvalue(k,0)                                 
+                      
+                   val = val.tr('^A-Za-z0-9', '')
+                  @dirlist[k] = dir_item(val)                  
+                                        
+                  k = k+1                  
+               end 
+                                         
+               
+                res3.each_with_index do |row2,m|
+                                 
+                  val = res3.getvalue(m,0)    
+                   val = val.tr('^A-Za-z0-9', '')                                
+                      
+                  @dirlist[k] = file_item(val,'20')
+                     
+                  m = m+1                      
+                  k = k+1
+                  
+               end           
+           
+            yield [ *dirlist ]               
+           
+          
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      
+      closedb(conn)
+    
+    end       
    else
      
       yield []
@@ -262,15 +309,13 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
     
        conn.prepare('stmt1','select name,data from files where name=$1 and pname=$2')
     
-    puts path
+    puts "getting file from : "+path
     
-       res = conn.exec_prepared('stmt1',[path,current_dirid||'1'])
-       
+       res = conn.exec_prepared('stmt1',[path,current_dirid||'1'])       
        
           data = res.getvalue(0,1)
           
-          if File.exist?("/home/harssh/Documents"+path)
-            
+          if File.exist?("/home/harssh/Documents"+path)            
 
              file = File.open("/home/harssh/Documents"+path, "w")
           
@@ -309,22 +354,14 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
     begin
        conn = connecttodb() 
     
-       conn.prepare('stmt1','select length(data) from file where name=$1')              
+       conn.prepare('stmt1','select length(data) from files where name=$1')              
     
        res = conn.exec_prepared('stmt1',[path])
     
        fcontent = res.getvalue(0,0)
        
-       if res.count ==0
-          yield true
-     
-        else
-          
-          yield false
-
-       end
-               
-            return fcontent  
+       yield fcontent
+         
     rescue Exception => e
       
       puts e.message
