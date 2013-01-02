@@ -1,15 +1,17 @@
 
 require 'pg'
+require 'em-ftpd'
+require 'eventmachine'
 
 class PgFTPDriver
-  FILE_ONE = "This is the first file available for download.\n\nBy James"
+  
 attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
 
   def change_dir(path, &block)
     
   begin
        conn = connecttodb() 
-    puts path
+       puts path
        conn.prepare('stmt2','select name,foid from folders where pname=$1 and name=$2')
     
        res = conn.exec_prepared('stmt2',[current_dirid||'1',path])
@@ -45,13 +47,7 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
        conn = connecttodb() 
        puts path
       
-       # conn.prepare('stmt1','select foid from folders where name=$1')
-#        
-       # res1 = conn.exec_prepared('stmt1',[current_dir||'/'])
-#        
-#       
-         # dirid = res1.getvalue(0,0)
-      
+           
        conn.prepare('stmt6','insert into folders (name,pname) values ($1,$2)')
               
     
@@ -105,19 +101,15 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
     begin
        conn = connecttodb() 
     
-       conn.prepare('stmt1','insert into file (name,data,pnmae) values ($1,$2,$3)')
+       conn.prepare('stmt1','insert into files (name,data,pname) values ($1,$2,$3)')
     
-       res = conn.exec_prepared('stmt1',[path,data,current_dir||"/"])
+       res = conn.exec_prepared('stmt1',[path,data,current_dirid||"1"])
     
-           if res.count == 1
-           yield true
-           
-         else                    
-         
-          yield false         
           
-             
-         end   
+           yield true
+               
+                    
+          
     rescue Exception => e
       
       puts e.message
@@ -133,10 +125,10 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
    begin
        conn = connecttodb() 
     
-       conn.prepare('stmt6','delete from file where name=$1')
+       conn.prepare('stmt6','delete from file where name=$1 and pname=$2')
               
     
-       res4 = conn.exec_prepared('stmt6',[path])
+       res4 = conn.exec_prepared('stmt6',[path,current_dirid||'1'])
        
             yield true           
          
@@ -154,15 +146,22 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
   def delete_dir(path, &block)
     begin
        conn = connecttodb() 
+       
+       conn.prepare('stmt9','select foid from folders where name=$1 and pname=$2')
     
-       conn.prepare('stmt6','delete from folder where name=$1')
+       conn.prepare('stmt6','delete from folders where name=$1 and pname=$2')
        
        conn.prepare('stmt7','delete from folder where pname=$1')
-       
+      
+       res9 = conn.exec_prepared('stmt9',[path,current_dirid||'1'])
     
-       res4 = conn.exec_prepared('stmt6',[path])
+       res6 = conn.exec_prepared('stmt6',[path,current_dirid||'1'])
        
-       res5 = conn.exec_prepared('stmt7',[path])
+       
+       parent_id = res9.getvalue(0,0)
+       
+       res7 = conn.exec_prepared('stmt7',[parent_id])
+       
        
            
            yield true         
@@ -185,13 +184,15 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
     
   when path then    
     
+  path =  "/"+path.tr('^A-Za-z', '')
+  
+  puts path
     begin
           conn = connecttodb()     
-           
-           
+                     
           conn.prepare('stmt4','select name from folders where pname=$1')
              
-          conn.prepare('stmt5', 'select name,data from file where pnmae=$1')    
+          conn.prepare('stmt5', 'select name,data from files where pname=$1')    
                 
           res2 = conn.exec_prepared('stmt4',[current_dirid||'1'])
           
@@ -199,38 +200,50 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
                          
                folderlist = Array.new
                @dirlist = Array.new
-                                           
-               res2.each_with_index do |row1,k|
+                  k =0                         
+            
+               res2.each do |row1|
                                  
-                 val = res2.getvalue(k,0)
+                  val = res2.getvalue(k,0)
                  
-                 fname = val.tr('^A-Za-z0-9', '')
+                  fname = val.tr('^A-Za-z0-9', '')
+                  puts val
+                  folderlist[k] = val                   
+                      
+                  @dirlist[k] = dir_item(val)
+                     
+                                        
+                  k = k+1
                   
-                  folderlist[k] = fname         
-              
-                      
-                 @dirlis = dir_item(fname)
-                      
-                      @dirlist[k] = @dirlis
-                      
-                 k = k+1
-                  
-                end       
-              puts folderlist
-                puts dirlist
-           #  yield [ dirlist]  
-             Enumerator.new do |y|
-    
-    dirlist.each { |val| y.yield(val) }
-  end.each(&block)
+               end 
                
-              
+               puts k
+               
+                res3.each_with_index do |row2,m|
+                                 
+                  val = res3.getvalue(m,0)
+                 
+                 # fname = val.tr('^A-Za-z0-9', '')
+                  
+                  folderlist[k] = val                   
+                      
+                  @dirlist[k] = file_item(val,'20')
+                     
+                  m = m+1                      
+                  k = k+1
+                  
+               end           
+           
+            yield [ *dirlist ]  
+             
+           
           
     rescue Exception => e
       
       puts e.message
       
     ensure
+      
       closedb(conn)
     
     end    
@@ -239,8 +252,7 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
      
       yield []
       
-      end
-        
+      end        
      
   end
   
@@ -248,11 +260,11 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
      begin
        conn = connecttodb() 
     
-       conn.prepare('stmt1','select name,data from file where name=$1')
+       conn.prepare('stmt1','select name,data from files where name=$1 and pname=$2')
     
     puts path
     
-       res = conn.exec_prepared('stmt1',[path])
+       res = conn.exec_prepared('stmt1',[path,current_dirid||'1'])
        
        
           data = res.getvalue(0,1)
@@ -286,9 +298,7 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
       
       closedb(conn)
       
-      file.close unless file == nil
-          
-              
+      file.close unless file == nil             
       
     end
     
@@ -313,8 +323,7 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
           yield false
 
        end
-      
-         
+               
             return fcontent  
     rescue Exception => e
       
@@ -330,11 +339,10 @@ attr_accessor :current_dir  ,:current_dirid,:dirlis,:dirlist
   
 private
 
-  def dir_item(*name)
+  def dir_item(name)
         
       EM::FTPD::DirectoryItem.new(:name => name, :directory => true, :size => 0)
-             
-  
+               
   end
 
   def file_item(name,bytes)
