@@ -9,6 +9,10 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
 
   def change_dir(path, &block)
     
+  case path
+    
+  when path then
+    
   begin
        conn = connecttodb() 
        puts "changing dir to : "+path
@@ -39,6 +43,47 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
     ensure
       closedb(conn)
     
+    end
+    
+    when ".." then
+      
+      begin
+       conn = connecttodb() 
+       puts "changing dir to : "+path
+       
+      
+       conn.prepare('stmt2','select pname from folders where pname=$1 and name=$2')
+    
+       res = conn.exec_prepared('stmt2',[current_dirid||'1',path])
+               
+         if res.count == 1
+           
+           currentdir(path,res.getvalue(0,1))
+                      
+           puts "Current dir is : "+current_dir
+           
+           puts "Current dir id is : "+current_dirid
+           yield true           
+         
+         else   
+         
+          yield false         
+          
+             
+         end   
+    
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      closedb(conn)
+    
+    end
+    
+    else 
+      yield true
+      
     end
   end
   
@@ -179,7 +224,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
     
   end
  
-  def dir_contents(path, &block)
+ def dir_contents(path, &block)
      
   case path
     
@@ -246,7 +291,8 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
         path =  "/"+path.tr('^A-Za-z0-9.', '')
   
         puts "contents of : "+path
-    begin
+     
+     begin
           conn = connecttodb()     
                      
           conn.prepare('stmt4','select name from folders where pname=$1')
@@ -398,7 +444,7 @@ private
     
   end
 
-def currentdir(path,id)
+def currentdir(path="/",id="1")
   
   @current_dir = path
   @current_dirid = id
