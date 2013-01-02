@@ -185,7 +185,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
     
   when "/" then    
     
-  path =  "/"+path.tr('^A-Za-z', '')
+  path =  "/"+path.tr('^A-Za-z0-9.', '')
   
   puts "contents of : "+path
     begin
@@ -206,7 +206,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
                res2.each do |row1|                                 
                   val = res2.getvalue(k,0)                                 
                
-                  val = val.tr('^A-Za-z0-9', '')
+                  val = val.tr('^A-Za-z0-9.', '')
                
                   @dirlist[k] = dir_item(val)                  
                                         
@@ -218,7 +218,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
                                  
                   val = res3.getvalue(m,0)                                    
                       
-                    val = val.tr('^A-Za-z0-9', '')
+                    val = val.tr('^A-Za-z0-9.', '')
                
                  
                   @dirlist[k] = file_item(val,'20')
@@ -243,7 +243,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
      
      when path then    
     
-        path =  "/"+path.tr('^A-Za-z', '')
+        path =  "/"+path.tr('^A-Za-z0-9.', '')
   
         puts "contents of : "+path
     begin
@@ -264,7 +264,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
                res2.each do |row1|                                 
                   val = res2.getvalue(k,0)                                 
                       
-                   val = val.tr('^A-Za-z0-9', '')
+                   val = val.tr('^A-Za-z0-9.', '')
                   @dirlist[k] = dir_item(val)                  
                                         
                   k = k+1                  
@@ -274,7 +274,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
                 res3.each_with_index do |row2,m|
                                  
                   val = res3.getvalue(m,0)    
-                   val = val.tr('^A-Za-z0-9', '')                                
+                   val = val.tr('^A-Za-z0-9.', '')                                
                       
                   @dirlist[k] = file_item(val,'20')
                      
