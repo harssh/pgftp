@@ -8,17 +8,22 @@ class PgFTPDriver
 attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
 
   def change_dir(path, &block)
-    
+   
+    dirname = path.match(/([^\/.]*)$/)
+   
+    ndirname = "/"+dirname[0]
   case path
     
   when path then
     
   begin
        conn = connecttodb() 
-       puts "changing dir to : "+path
+       
+       puts "changing dir to : "+ndirname
+       
        conn.prepare('stmt2','select name,foid from folders where pname=$1 and name=$2')
     
-       res = conn.exec_prepared('stmt2',[current_dirid||'1',path])
+       res = conn.exec_prepared('stmt2',[current_dirid||'1',ndirname])
                
          if res.count == 1
            
@@ -147,12 +152,18 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
   
   def put_file(path, data, &block)
     
+    newfilename = path.match(/([^\/.]*)$/)
+   
+    nfilename = "/"+newfilename[0]
+    
+    puts "running put file method"
+    
     begin
        conn = connecttodb() 
     
-       conn.prepare('stmt1','insert into files (name,data,pname) values ($1,$2,$3)')
+       conn.prepare('stmt1','insert into files (name,fdata,pname) values ($1,$2,$3)')
     
-       res = conn.exec_prepared('stmt1',[path,data,current_dirid||"1"])    
+       res = conn.exec_prepared('stmt1',[nfilename,data,current_dirid||"1"])    
           
            yield true                   
           
@@ -167,13 +178,53 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
     
   end
 
+  def put_file_streamed(path, data , &block)
+   
+    puts "running put file stream method"
+      
+    newfilename = path.match(/([^\/.]*)$/)
+    
+    nfilename = "/"+newfilename[0]
+    
+    begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt1','insert into files (name,pname) values ($1,$2)')
+    
+       res = conn.exec_prepared('stmt1',[nfilename,current_dirid||"1"])    
+                     
+       conn.prepare('stmt10','update files set fdata = fdata || $1 where name = $2 and pname = $3')
+       
+       data.on_stream { |chunk|
+         
+         res1 = conn.exec_prepared('stmt10',[chunk,nfilename,current_dirid||"1"])
+           
+                        }  
+       yield true                   
+          
+     rescue Exception => e
+      
+     puts e.message
+      
+     ensure
+          
+    end
+       
+  end
+
+  
+  
   def delete_file(path, &block)
+   
+   filename = path.match(/([^\/.]*)$/)
+    
+    nfilename = "/"+filename[0]
    begin
        conn = connecttodb() 
     
        conn.prepare('stmt6','delete from files where name=$1 and pname=$2')
                   
-       res4 = conn.exec_prepared('stmt6',[path,current_dirid||'1'])
+       res4 = conn.exec_prepared('stmt6',[nfilename,current_dirid||'1'])
        
             yield true           
          
@@ -189,25 +240,32 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
   end
 
   def delete_dir(path, &block)
-   
+    
+    filename = path.match(/([^\/.]*)$/)
+    
+    nfilename = "/"+filename[0]
+    
     begin
-    puts path
+    
+       puts "deleting dir : "+nfilename
+    
        conn = connecttodb()      
        
        conn.prepare('stmt9','select foid from folders where name=$1 and pname=$2')
     
-       conn.prepare('stmt6','delete from folders where name=$1 and pname=$2')
+       conn.prepare('stmt6','delete from folders where name=$1')
        
-       conn.prepare('stmt7','delete from folder where pname=$1')
+     #  conn.prepare('stmt7','delete from folder where pname=$1')
       
-       res9 = conn.exec_prepared('stmt9',[path,current_dirid||'1'])
+       res9 = conn.exec_prepared('stmt9',[nfilename,current_dirid||'1'])
     
-       res6 = conn.exec_prepared('stmt6',[path,current_dirid||'1'])
+       res6 = conn.exec_prepared('stmt6',[nfilename])
        
        
        parent_id = res9.getvalue(0,0)
        
-       res7 = conn.exec_prepared('stmt7',[parent_id])     
+      
+      # res7 = conn.exec_prepared('stmt7',[parent_id])     
        
            
            yield true         
@@ -224,13 +282,16 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
     
   end
  
- def dir_contents(path, &block)
+  def dir_contents(path, &block)
      
+     
+     path1 = path.match(/([^\/.]*)$/)
+   
+     path = "/"+path1[0]
   case path
     
   when "/" then    
-    
-  path =  "/"+path.tr('^A-Za-z0-9.', '')
+     
   
   puts "contents of : "+path
     begin
@@ -238,7 +299,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
                      
           conn.prepare('stmt4','select name from folders where pname=$1')
              
-          conn.prepare('stmt5', 'select name,data from files where pname=$1')    
+          conn.prepare('stmt5', 'select name,fdata from files where pname=$1')    
                 
           res2 = conn.exec_prepared('stmt4',[current_dirid||'1'])
           
@@ -297,7 +358,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
                      
           conn.prepare('stmt4','select name from folders where pname=$1')
              
-          conn.prepare('stmt5', 'select name,data from files where pname=$1')    
+          conn.prepare('stmt5', 'select name,fdata from files where pname=$1')    
                 
           res2 = conn.exec_prepared('stmt4',[current_dirid||'1'])
           
@@ -350,31 +411,43 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
   end
   
   def get_file(path, &block)
+     
+     puts "file path : "+path
+     
+     filename = path.match(/([^\/.]*)$/)
+    
+     nfilename = "/"+filename[0]
+     
      begin
        conn = connecttodb() 
     
-       conn.prepare('stmt1','select name,data from files where name=$1 and pname=$2')
+       conn.prepare('stmt1','select name,fdata from files where name=$1')
     
-    puts "getting file from : "+path
+       puts "getting file  "+nfilename
     
-       res = conn.exec_prepared('stmt1',[path,current_dirid||'1'])       
+       res = conn.exec_prepared('stmt1',[nfilename])       
        
-          data = res.getvalue(0,1)
+          fdata = res.getvalue(0,1)
           
-          if File.exist?("/home/harssh/Documents"+path)            
+          if File.exist?("/home/harssh/Documents"+nfilename)            
 
-             file = File.open("/home/harssh/Documents"+path, "w")
+             file = File.open("/home/harssh/Documents"+nfilename, "w+")
           
-             file.write("#{data}") 
+             file.write("#{fdata}") 
              
+                  yield File.size(res.getvalue(0,0))
+          
+         
           else
            
-              File.new("/home/harssh/Documents"+path, "w")
+              File.new("/home/harssh/Documents"+nfilename, "w+")
 
-              file = File.open("/home/harssh/Documents"+path, "w")
+              file = File.open("/home/harssh/Documents"+nfilename, "a")
           
-              file.write("#{data}") 
+              file.write("#{fdata}") 
          
+              yield File.size(res.getvalue(0,0))
+          
           end
                 
                 yield true
@@ -394,19 +467,97 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
     end
     
   end
+  
+  def get_file_streamed(path , data, &block)
+   
+     puts "file path : "+path
+     
+    filename = path.match(/([^\/.]*)$/)
+    
+     nfilename = "/"+filename[0]
+     
+     begin
+       conn = connecttodb() 
+    
+       conn.prepare('stmt1','select name,fdata from files where name=$1')
+    
+       puts "getting file  "+nfilename
+    
+       res = conn.exec_prepared('stmt1',[nfilename])       
+       
+          fdata = res.getvalue(0,1)
+          
+          if File.exist?("/home/harssh/Documents"+nfilename)            
+
+             file = File.open("/home/harssh/Documents"+nfilename, "a")
+             
+             data.on_stream { |chunk|
+         
+             file.write("#{chunk}") 
+           
+                             }  
+          
+             
+             
+              yield bytes(fdata)
+         
+          else
+           
+              File.new("/home/harssh/Documents"+nfilename, "w+")
+
+              file = File.open("/home/harssh/Documents"+nfilename, "a")
+          
+             data.on_stream { |chunk|
+         
+             file.write("#{chunk}") 
+           
+                        }  
+          
+         
+              yield bytes(fdata)
+          
+          end
+                
+                yield true
+                     
+          
+                     
+    rescue Exception => e
+      
+      puts e.message
+      
+    ensure
+      
+      
+      
+      file.close unless file == nil             
+      
+    end
+    
+    
+    
+  end
  
   def bytes(path, &block)
+    
+    filename = path.match(/([^\/.]*)$/)
+    
+    nfilename = "/"+filename[0]
     
     begin
        conn = connecttodb() 
     
-       conn.prepare('stmt1','select length(data) from files where name=$1')              
+        puts "reading bytes of : "+nfilename
+        
+       conn.prepare('stmt1','select fdata from files where name=$1')              
     
-       res = conn.exec_prepared('stmt1',[path])
+       res = conn.exec_prepared('stmt1',[nfilename])
     
-       fcontent = res.getvalue(0,0)
+       data = res.getvalue(0,0)
        
-       yield fcontent
+       yield data.size
+       
+       
          
     rescue Exception => e
       
@@ -420,6 +571,7 @@ attr_accessor :current_dir ,:current_dirid,:dirlis,:dirlist
    
   end
   
+    
 private
 
   def dir_item(name)
@@ -444,13 +596,13 @@ private
     
   end
 
-def currentdir(path="/",id="1")
+  def currentdir(path="/",id="1")
   
   @current_dir = path
   @current_dirid = id
   
   
-end  
+  end  
 
   
 end
