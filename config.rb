@@ -1,4 +1,4 @@
-require './pgFTPdriver'
+require './PgFTPDriver'
 
 driver    PgFTPDriver
 #user      'test'

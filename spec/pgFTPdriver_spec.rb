@@ -1,7 +1,7 @@
 
 
 #require 'pg'
-require 'pgFTPdriver'
+
 
 describe pgFTPdriver do
 
